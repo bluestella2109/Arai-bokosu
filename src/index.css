@@ -482,6 +482,88 @@ body {
   }
 }
 
+/* ==========================================================================
+   RAGE MODE (激怒モード) & BACKGROUND TRANSFORMATION
+   ========================================================================== */
+
+.bg-rage-mode {
+  background-color: #1a0206 !important;
+  background-image: 
+    radial-gradient(circle at 50% 50%, rgba(255, 0, 60, 0.38) 0%, rgba(35, 2, 8, 0.95) 65%, #050001 100%),
+    repeating-conic-gradient(from 0deg, rgba(255, 0, 60, 0.16) 0deg 15deg, transparent 15deg 30deg) !important;
+  box-shadow: inset 0 0 80px rgba(255, 0, 60, 0.8), inset 0 0 160px rgba(0, 0, 0, 0.9);
+  animation: rage-pulse 0.35s ease-in-out infinite alternate;
+}
+
+@keyframes rage-pulse {
+  0% {
+    box-shadow: inset 0 0 60px rgba(255, 0, 60, 0.7), inset 0 0 140px rgba(0, 0, 0, 0.9);
+  }
+  100% {
+    box-shadow: inset 0 0 110px rgba(255, 0, 60, 0.95), inset 0 0 180px rgba(255, 0, 60, 0.3);
+  }
+}
+
+/* Rage Mode Constant Explosion Effect */
+.rage-explosion-burst {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 180px;
+  height: 180px;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.95) 0%, rgba(255, 0, 60, 0.85) 45%, rgba(255, 60, 0, 0.5) 75%, transparent 100%);
+  animation: explosion-burst-kf 0.32s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
+  pointer-events: none;
+  filter: drop-shadow(0 0 35px #ff003c);
+}
+
+@keyframes explosion-burst-kf {
+  0% {
+    transform: translate(-50%, -50%) scale(0.1);
+    opacity: 1;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.4);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(2.2);
+    opacity: 0;
+  }
+}
+
+/* Rage Mode Fiery Edge Glow */
+.rage-fire-edge {
+  box-shadow: 0 0 25px #ff003c, inset 0 0 25px #ff003c;
+  animation: fire-edge-shake 0.15s ease-in-out infinite alternate;
+}
+
+@keyframes fire-edge-shake {
+  0% { transform: scale(1); filter: brightness(1.1); }
+  100% { transform: scale(1.02); filter: brightness(1.4); }
+}
+
+/* Rage Meter Liquid Bar */
+.rage-meter-bar {
+  background: linear-gradient(90deg, #ff003c 0%, #ff3b30 60%, #ffffff 100%);
+  box-shadow: 0 0 15px #ff003c;
+}
+
+.rage-meter-max {
+  animation: meter-max-pulse 0.25s infinite alternate;
+}
+
+@keyframes meter-max-pulse {
+  0% {
+    box-shadow: 0 0 15px #ff003c, 0 0 30px #ff3b30;
+    filter: brightness(1.2);
+  }
+  100% {
+    box-shadow: 0 0 30px #ff003c, 0 0 50px #ffffff;
+    filter: brightness(1.6);
+  }
+}
+
 /* Buttons in Minimal Black/White/Red Style */
 .btn-arcade-red {
   background-color: #ff003c;

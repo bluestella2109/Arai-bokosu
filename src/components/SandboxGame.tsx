@@ -3,7 +3,7 @@ import { CharacterTarget, HitEffect, WeaponType } from '../types/game';
 import { ONOMATOPOEIA_LIST, WEAPONS } from '../data/characters';
 import { soundManager } from '../utils/audio';
 import { ArcadePunchOverlay } from './ArcadePunchOverlay';
-import { Zap, Heart, RotateCcw, Camera } from 'lucide-react';
+import { Zap, RotateCcw, Camera, Flame } from 'lucide-react';
 
 interface SandboxGameProps {
   character: CharacterTarget;
@@ -28,14 +28,10 @@ export const SandboxGame: React.FC<SandboxGameProps> = ({
   const [targetAnim, setTargetAnim] = useState<string>('');
   const [isTurbo, setIsTurbo] = useState<boolean>(false);
 
-  // Super Meter
-  const [superMeter, setSuperMeter] = useState<number>(0);
-  const [superFinisher, setSuperFinisher] = useState<{
-    active: boolean;
-    title: string;
-    x: number;
-    y: number;
-  } | null>(null);
+  // 怒りゲージ (0 to 100%) & 激怒モード (Rage Mode)
+  const [rageMeter, setRageMeter] = useState<number>(0);
+  const [isRageMode, setIsRageMode] = useState<boolean>(false);
+  const [rageTimeRemaining, setRageTimeRemaining] = useState<number>(0);
 
   const [effects, setEffects] = useState<HitEffect[]>([]);
   const [activeFist, setActiveFist] = useState<{
@@ -53,28 +49,26 @@ export const SandboxGame: React.FC<SandboxGameProps> = ({
   const lastPunchRef = useRef<number>(0);
   const fistVectorRef = useRef<number>(0);
 
-  // Trigger 超必殺技
-  const triggerSuper = (x: number, y: number) => {
-    soundManager.playSuperFinisher();
-    setSuperMeter(0);
-    setSuperFinisher({
-      active: true,
-      title: '極・爆打昇天拳',
-      x,
-      y
-    });
+  // 激怒モードタイマーループ
+  useEffect(() => {
+    if (!isRageMode) return;
 
-    setScreenShake('arcade-shake-super');
-    setTimeout(() => {
-      setSuperFinisher(null);
-      setScreenShake('');
-    }, 1200);
+    const interval = window.setInterval(() => {
+      setRageTimeRemaining((prev) => {
+        if (prev <= 0.1) {
+          clearInterval(interval);
+          setIsRageMode(false);
+          setRageMeter(0);
+          return 0;
+        }
+        return Math.max(0, prev - 0.1);
+      });
+    }, 100);
 
-    setTotalDamage((prev) => prev + 2500);
-    setCurrentHp((prev) => Math.max(0, prev - 450));
-  };
+    return () => clearInterval(interval);
+  }, [isRageMode]);
 
-  // Punch execution with arcade mechanics
+  // Punch execution with arcade mechanics & rage mode
   const executePunch = (coords?: { x: number; y: number }) => {
     if (isKO) return;
 
@@ -103,24 +97,37 @@ export const SandboxGame: React.FC<SandboxGameProps> = ({
 
     soundManager.playWhoosh();
 
-    const isCritical = Math.random() < 0.28;
-    const nextMeter = Math.min(100, superMeter + 8);
-    setSuperMeter(nextMeter);
+    // 怒りゲージ蓄積
+    if (!isRageMode) {
+      const nextRage = Math.min(100, rageMeter + 6.5);
+      setRageMeter(nextRage);
 
-    if (nextMeter >= 100) {
-      triggerSuper(50, 50);
+      if (nextRage >= 100) {
+        setIsRageMode(true);
+        setRageTimeRemaining(8.0);
+        soundManager.playRageRoar();
+        setScreenShake('arcade-shake-super');
+      }
+    }
+
+    const isCritical = Math.random() < 0.28 || isRageMode;
+
+    // 激怒モード中は爆発音
+    if (isRageMode) {
+      soundManager.playExplosion();
     } else if (isCritical) {
       soundManager.playHeavyPunch();
     } else {
       soundManager.playPunch(1.2);
     }
 
-    // ① ヒットストップ
+    // ヒットストップ
     setIsHitstop(true);
     soundManager.playHitstopBass();
     setTimeout(() => setIsHitstop(false), 55);
 
-    const dmg = Math.floor(Math.random() * 60 + 60) * (isCritical ? 2 : 1);
+    const baseDmg = Math.floor(Math.random() * 60 + 60) * (isCritical ? 2 : 1);
+    const dmg = isRageMode ? baseDmg * 3 : baseDmg;
     setTotalDamage((prev) => prev + dmg);
     setTotalPunches((prev) => prev + 1);
     setCombo((prev) => prev + 1);
@@ -140,17 +147,19 @@ export const SandboxGame: React.FC<SandboxGameProps> = ({
       y: 50,
       vector: chosenVector,
       id: 'fist_' + now,
-      isSuper: isCritical,
-      isRapid
+      isSuper: isCritical || isRageMode,
+      isRapid: isRapid || isRageMode
     });
 
-    // Effect
-    const onom = ONOMATOPOEIA_LIST[Math.floor(Math.random() * ONOMATOPOEIA_LIST.length)];
-    const particles = Array.from({ length: isCritical ? 5 : 3 }).map(() => ({
-      tx: (Math.random() - 0.5) * 140,
-      ty: -Math.random() * 100 - 20,
+    const onom = isRageMode
+      ? 'ドゴォォン！！'
+      : ONOMATOPOEIA_LIST[Math.floor(Math.random() * ONOMATOPOEIA_LIST.length)];
+
+    const particles = Array.from({ length: isRageMode ? 7 : isCritical ? 5 : 3 }).map(() => ({
+      tx: (Math.random() - 0.5) * 160,
+      ty: -Math.random() * 120 - 20,
       trot: Math.random() * 360,
-      char: isCritical ? '💢' : '💥'
+      char: isRageMode ? '🔥' : isCritical ? '💢' : '💥'
     }));
 
     const newEffect: HitEffect = {
@@ -158,23 +167,23 @@ export const SandboxGame: React.FC<SandboxGameProps> = ({
       x: posX,
       y: posY,
       onomatopoeia: onom,
-      color: isCritical ? '#ff003c' : '#ffffff',
+      color: isCritical || isRageMode ? '#ff003c' : '#ffffff',
       rotation: (Math.random() - 0.5) * 30,
       damage: dmg,
-      isCritical,
+      isCritical: isCritical || isRageMode,
       weapon,
       particles
     };
     setEffects((prev) => [...prev.slice(-6), newEffect]);
 
-    // ① 画像の吹っ飛び / 反動アニメーション
+    // 反動アニメーション
     const anims = ['target-blowback-right', 'target-blowback-left', 'target-blowback-up'];
     const selAnim = anims[Math.floor(Math.random() * anims.length)];
     setTargetAnim(selAnim);
     setTimeout(() => setTargetAnim(''), 220);
 
     // Screen Shake
-    setScreenShake(isCritical ? 'arcade-shake-heavy' : 'arcade-shake-light');
+    setScreenShake(isRageMode ? 'arcade-shake-heavy' : isCritical ? 'arcade-shake-heavy' : 'arcade-shake-light');
     setTimeout(() => setScreenShake(''), 180);
   };
 
@@ -228,7 +237,7 @@ export const SandboxGame: React.FC<SandboxGameProps> = ({
     return () => {
       if (turboIntervalRef.current) clearInterval(turboIntervalRef.current);
     };
-  }, [isTurbo, isKO]);
+  }, [isTurbo, isKO, isRageMode]);
 
   useEffect(() => {
     if (effects.length === 0) return;
@@ -243,9 +252,9 @@ export const SandboxGame: React.FC<SandboxGameProps> = ({
   return (
     <div
       ref={arenaRef}
-      className={`relative w-full h-[calc(100dvh-70px)] min-h-[580px] bg-arcade-grid flex flex-col justify-between overflow-hidden select-none cursor-crosshair ${screenShake} ${
-        isHitstop ? 'hitstop-flash-bg' : ''
-      }`}
+      className={`relative w-full h-[calc(100dvh-70px)] min-h-[580px] flex flex-col justify-between overflow-hidden select-none cursor-crosshair transition-colors duration-500 ${
+        isRageMode ? 'bg-rage-mode' : 'bg-arcade-grid'
+      } ${screenShake} ${isHitstop ? 'hitstop-flash-bg' : ''}`}
     >
       {/* Top HUD */}
       <div className="w-full px-4 pt-3 pb-2 z-40 flex items-center justify-between pointer-events-none">
@@ -264,7 +273,9 @@ export const SandboxGame: React.FC<SandboxGameProps> = ({
         </div>
 
         {/* Stats */}
-        <div className="flex items-center gap-4 bg-[#101014]/90 border border-[#27272a] px-4 py-1.5 rounded-xl">
+        <div className={`flex items-center gap-4 bg-[#101014]/90 border px-4 py-1.5 rounded-xl transition-colors ${
+          isRageMode ? 'border-[#ff003c] shadow-[0_0_20px_rgba(255,0,60,0.5)]' : 'border-[#27272a]'
+        }`}>
           <div className="text-right">
             <div className="text-[9px] text-[#71717a] font-arcade-mono uppercase font-bold">DAMAGE</div>
             <div className="font-arcade-mono text-xl font-black text-[#ff003c] tabular-nums">
@@ -283,7 +294,7 @@ export const SandboxGame: React.FC<SandboxGameProps> = ({
       {/* Center Punch Target */}
       <div className="flex-1 flex flex-col items-center justify-center relative z-20">
         {/* HP Bar */}
-        <div className="w-64 max-w-xs mb-6">
+        <div className="w-64 max-w-xs mb-4">
           <div className="flex items-center justify-between text-[10px] font-arcade-mono text-[#71717a] mb-1">
             <span>DURABILITY HP</span>
             <span>{currentHp}/{maxHp}</span>
@@ -303,20 +314,20 @@ export const SandboxGame: React.FC<SandboxGameProps> = ({
           onTouchStart={handleFaceClick}
           className={`relative cursor-pointer transition-transform duration-75 active:scale-90 ${targetAnim} ${
             isHitstop ? 'hitstop-active' : ''
-          }`}
+          } ${isRageMode ? 'rage-fire-edge' : ''}`}
         >
           <div className="relative w-48 h-48 md:w-56 md:h-56 flex items-center justify-center group">
-            {/* Spinning Radar Ring */}
-            <div className="reticle-crosshair" />
+            <div className={`reticle-crosshair ${isRageMode ? 'border-[#ff003c]' : ''}`} />
 
-            {/* Corner Brackets */}
-            <div className="reticle-bracket top-0 left-0 border-t-2 border-l-2" />
-            <div className="reticle-bracket top-0 right-0 border-t-2 border-r-2" />
-            <div className="reticle-bracket bottom-0 left-0 border-b-2 border-l-2" />
-            <div className="reticle-bracket bottom-0 right-0 border-b-2 border-r-2" />
+            <div className={`reticle-bracket top-0 left-0 border-t-2 border-l-2 ${isRageMode ? 'border-[#ff003c]' : ''}`} />
+            <div className={`reticle-bracket top-0 right-0 border-t-2 border-r-2 ${isRageMode ? 'border-[#ff003c]' : ''}`} />
+            <div className={`reticle-bracket bottom-0 left-0 border-b-2 border-l-2 ${isRageMode ? 'border-[#ff003c]' : ''}`} />
+            <div className={`reticle-bracket bottom-0 right-0 border-b-2 border-r-2 ${isRageMode ? 'border-[#ff003c]' : ''}`} />
 
             {/* Face Portrait */}
-            <div className="relative w-36 h-36 md:w-44 md:h-44 rounded-full overflow-hidden border-2 border-white/60 bg-black shadow-[0_0_30px_rgba(0,0,0,0.8)]">
+            <div className={`relative w-36 h-36 md:w-44 md:h-44 rounded-full overflow-hidden border-2 bg-black shadow-[0_0_30px_rgba(0,0,0,0.8)] ${
+              isRageMode ? 'border-[#ff003c] shadow-[0_0_30px_#ff003c]' : 'border-white/60'
+            }`}>
               <img
                 src={character.image}
                 alt={character.name}
@@ -338,11 +349,46 @@ export const SandboxGame: React.FC<SandboxGameProps> = ({
         </div>
       </div>
 
-      {/* Arcade Punch Overlay */}
+      {/* 画面下部：怒りゲージ (RAGE GAUGE) */}
+      <div className="w-full max-w-sm mx-auto px-4 z-30 mb-2 pointer-events-none">
+        <div className="flex items-center justify-between w-full text-[10px] font-arcade-mono font-bold tracking-widest mb-1">
+          <span className="flex items-center gap-1.5 text-white">
+            <Flame className={`w-3.5 h-3.5 ${isRageMode ? 'text-[#ff003c] animate-spin' : rageMeter >= 85 ? 'text-[#ff003c] animate-bounce' : 'text-[#71717a]'}`} />
+            {isRageMode ? '🔥 激怒モード発動中！' : '怒りゲージ (RAGE METER)'}
+          </span>
+          <span className={`font-black ${isRageMode ? 'text-[#ff003c] animate-pulse' : 'text-white'}`}>
+            {isRageMode ? `残り ${rageTimeRemaining.toFixed(1)}s` : `${Math.round(rageMeter)}%`}
+          </span>
+        </div>
+
+        <div className={`w-full h-3 bg-[#14141a] border-2 rounded-full overflow-hidden p-0.5 transition-all ${
+          isRageMode
+            ? 'border-[#ff003c] shadow-[0_0_15px_#ff003c] rage-meter-max'
+            : rageMeter >= 85
+            ? 'border-[#ff003c] rage-meter-max'
+            : 'border-[#27272a]'
+        }`}>
+          <div
+            className={`h-full rounded-full transition-all duration-100 ${
+              isRageMode
+                ? 'bg-gradient-to-r from-red-600 via-rose-500 to-white shadow-[0_0_15px_#ff003c] animate-pulse'
+                : 'rage-meter-bar'
+            }`}
+            style={{
+              width: isRageMode
+                ? `${(rageTimeRemaining / 8.0) * 100}%`
+                : `${rageMeter}%`
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Arcade Punch Overlay with Rage Explosions */}
       <ArcadePunchOverlay
         effects={effects}
         activeFist={activeFist}
-        superFinisher={superFinisher}
+        superFinisher={null}
+        isRageMode={isRageMode}
       />
 
       {/* Bottom Controls */}

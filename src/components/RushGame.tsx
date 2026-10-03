@@ -3,7 +3,7 @@ import { CharacterTarget, HitEffect, WeaponType } from '../types/game';
 import { ONOMATOPOEIA_LIST, WEAPONS } from '../data/characters';
 import { soundManager } from '../utils/audio';
 import { ArcadePunchOverlay } from './ArcadePunchOverlay';
-import { Zap, Volume2, VolumeX, Camera, Trophy, Sparkles } from 'lucide-react';
+import { Zap, Volume2, VolumeX, Camera, Flame } from 'lucide-react';
 
 interface RushGameProps {
   character: CharacterTarget;
@@ -37,8 +37,13 @@ export const RushGame: React.FC<RushGameProps> = ({
   const [isHitstop, setIsHitstop] = useState<boolean>(false);
   const [showSpeedlines, setShowSpeedlines] = useState<boolean>(false);
 
+  // 怒りゲージ (0 to 100%) & 激怒モード (Rage Mode)
+  const [rageMeter, setRageMeter] = useState<number>(0);
+  const [isRageMode, setIsRageMode] = useState<boolean>(false);
+  const [rageTimeRemaining, setRageTimeRemaining] = useState<number>(0);
+  const [rageBanner, setRageBanner] = useState<boolean>(false);
+
   // Super Meter (0 to 100%)
-  const [superMeter, setSuperMeter] = useState<number>(0);
   const [superFinisher, setSuperFinisher] = useState<{
     active: boolean;
     title: string;
@@ -75,11 +80,9 @@ export const RushGame: React.FC<RushGameProps> = ({
   const arenaRef = useRef<HTMLDivElement>(null);
   const lastPunchTimeRef = useRef<number>(0);
   const fistVectorIndexRef = useRef<number>(0);
-  const timerFrameRef = useRef<number | null>(null);
   const startTimeRef = useRef<number>(0);
 
-  // Intelligent multi-sector random generator across entire viewport (Instruction ③)
-  // Covers top, middle, bottom, left, right, and corners evenly on desktop, iPad, & mobile
+  // Multi-sector random generator across entire viewport
   const getRandomScreenCoords = useCallback(() => {
     const sectors = [
       { xMin: 12, xMax: 32, yMin: 18, yMax: 38 }, // Top-Left
@@ -134,7 +137,9 @@ export const RushGame: React.FC<RushGameProps> = ({
         setHits(0);
         setCombo(0);
         setMaxCombo(0);
-        setSuperMeter(0);
+        setRageMeter(0);
+        setIsRageMode(false);
+        setRageTimeRemaining(0);
         startTimeRef.current = Date.now();
         spawnNewTarget();
       }
@@ -162,9 +167,29 @@ export const RushGame: React.FC<RushGameProps> = ({
     return () => cancelAnimationFrame(animId);
   }, [gameState]);
 
+  // 激怒モードタイマーループ (Rage Mode Duration Countdown - 7.5s)
+  useEffect(() => {
+    if (!isRageMode || gameState !== 'PLAYING') return;
+
+    const interval = window.setInterval(() => {
+      setRageTimeRemaining((prev) => {
+        if (prev <= 0.1) {
+          clearInterval(interval);
+          setIsRageMode(false);
+          setRageMeter(0);
+          return 0;
+        }
+        return Math.max(0, prev - 0.1);
+      });
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [isRageMode, gameState]);
+
   // End game handler
   useEffect(() => {
     if (gameState === 'ENDED') {
+      setIsRageMode(false);
       onFinishGame({
         score,
         hits,
@@ -176,7 +201,6 @@ export const RushGame: React.FC<RushGameProps> = ({
   // Trigger 超必殺技 (Super Finisher)
   const triggerSuperFinisher = (targetX: number, targetY: number) => {
     soundManager.playSuperFinisher();
-    setSuperMeter(0);
 
     setSuperFinisher({
       active: true,
@@ -191,8 +215,7 @@ export const RushGame: React.FC<RushGameProps> = ({
       setScreenShake('');
     }, 1200);
 
-    // Massive score bonus
-    setScore((prev) => prev + 500);
+    setScore((prev) => prev + (isRageMode ? 1000 : 500));
   };
 
   // Main Punch Action (Arcade-level CSS/JS mechanics)
@@ -224,12 +247,26 @@ export const RushGame: React.FC<RushGameProps> = ({
     const newHits = hits + 1;
     const newCombo = combo + 1;
     const newMaxCombo = Math.max(maxCombo, newCombo);
-    const newMeter = Math.min(100, superMeter + 7);
 
     setHits(newHits);
     setCombo(newCombo);
     setMaxCombo(newMaxCombo);
-    setSuperMeter(newMeter);
+
+    // 怒りゲージ更新 (連打数に応じて溜まる)
+    if (!isRageMode) {
+      const nextRage = Math.min(100, rageMeter + 6.5);
+      setRageMeter(nextRage);
+
+      // MAXまで溜まったら「激怒モード」発動！
+      if (nextRage >= 100) {
+        setIsRageMode(true);
+        setRageTimeRemaining(7.5);
+        soundManager.playRageRoar();
+        setRageBanner(true);
+        setTimeout(() => setRageBanner(false), 2000);
+        setScreenShake('arcade-shake-super');
+      }
+    }
 
     // ① 拳が画面外から飛んでくる (Flying fist vectors)
     const vectors: ('bl' | 'br' | 'tr' | 'up')[] = ['bl', 'br', 'tr', 'up'];
@@ -238,10 +275,12 @@ export const RushGame: React.FC<RushGameProps> = ({
 
     soundManager.playWhoosh();
 
-    const isCritical = Math.random() < 0.28 || newCombo % 10 === 0;
+    const isCritical = Math.random() < 0.28 || newCombo % 10 === 0 || isRageMode;
 
-    // Check if Super Move triggers
-    if (newMeter >= 100 || (newCombo > 0 && newCombo % 25 === 0)) {
+    // 激怒モード中は常時爆発音、通常時は通常音/クリティカル音
+    if (isRageMode) {
+      soundManager.playExplosion();
+    } else if (newCombo > 0 && newCombo % 25 === 0) {
       triggerSuperFinisher(currentTarget.x, currentTarget.y);
     } else if (isCritical) {
       soundManager.playHeavyPunch();
@@ -260,10 +299,11 @@ export const RushGame: React.FC<RushGameProps> = ({
     setShowSpeedlines(true);
     setTimeout(() => setShowSpeedlines(false), 220);
 
-    // Points calculation
+    // Points calculation (激怒モード中はスコア3倍〜5倍！)
     const basePts = isCritical ? 36 : 14;
     const comboBonus = Math.floor(newCombo * 1.5);
-    const totalDmg = basePts + comboBonus;
+    const rageMultiplier = isRageMode ? 3.5 : 1.0;
+    const totalDmg = Math.floor((basePts + comboBonus) * rageMultiplier);
     setScore((prev) => prev + totalDmg);
 
     // Dynamic flying fist visual
@@ -272,17 +312,20 @@ export const RushGame: React.FC<RushGameProps> = ({
       y: currentTarget.y,
       vector: chosenVector,
       id: 'fist_' + now,
-      isSuper: isCritical,
-      isRapid
+      isSuper: isCritical || isRageMode,
+      isRapid: isRapid || isRageMode
     });
 
     // Random arcade onomatopoeia
-    const onom = ONOMATOPOEIA_LIST[Math.floor(Math.random() * ONOMATOPOEIA_LIST.length)];
-    const particles = Array.from({ length: isCritical ? 5 : 3 }).map(() => ({
-      tx: (Math.random() - 0.5) * 140,
-      ty: -Math.random() * 100 - 20,
+    const onom = isRageMode
+      ? 'ドゴォォン！！'
+      : ONOMATOPOEIA_LIST[Math.floor(Math.random() * ONOMATOPOEIA_LIST.length)];
+
+    const particles = Array.from({ length: isRageMode ? 7 : isCritical ? 5 : 3 }).map(() => ({
+      tx: (Math.random() - 0.5) * 160,
+      ty: -Math.random() * 120 - 20,
       trot: Math.random() * 360,
-      char: isCritical ? '💢' : '💥'
+      char: isRageMode ? '🔥' : isCritical ? '💢' : '💥'
     }));
 
     const hitEff: HitEffect = {
@@ -290,14 +333,14 @@ export const RushGame: React.FC<RushGameProps> = ({
       x: relX,
       y: relY,
       onomatopoeia: onom,
-      color: isCritical ? '#ff003c' : '#ffffff',
+      color: isCritical || isRageMode ? '#ff003c' : '#ffffff',
       rotation: (Math.random() - 0.5) * 30,
       damage: totalDmg,
-      isCritical,
+      isCritical: isCritical || isRageMode,
       weapon,
       particles
     };
-    setEffects((prev) => [...prev.slice(-6), hitEff]);
+    setEffects((prev) => [...prev.slice(-7), hitEff]);
 
     // ① 画像の吹っ飛び (Target blowback physics animation)
     const blowbackOptions = ['target-blowback-right', 'target-blowback-left', 'target-blowback-up'];
@@ -309,8 +352,8 @@ export const RushGame: React.FC<RushGameProps> = ({
       blowbackAnim: chosenBlowback
     }));
 
-    // Screen Shake
-    setScreenShake(isCritical ? 'arcade-shake-heavy' : 'arcade-shake-light');
+    // Screen Shake (激怒モード中は激震)
+    setScreenShake(isRageMode ? 'arcade-shake-heavy' : isCritical ? 'arcade-shake-heavy' : 'arcade-shake-light');
     setTimeout(() => setScreenShake(''), 180);
 
     // Instantly spawn next target in new random screen position
@@ -343,16 +386,27 @@ export const RushGame: React.FC<RushGameProps> = ({
     <div
       ref={arenaRef}
       onClick={handleArenaMiss}
-      className={`relative w-full h-[calc(100dvh-70px)] min-h-[580px] bg-arcade-grid flex flex-col justify-between overflow-hidden select-none cursor-crosshair ${screenShake} ${
-        isHitstop ? 'hitstop-flash-bg' : ''
-      }`}
+      className={`relative w-full h-[calc(100dvh-70px)] min-h-[580px] flex flex-col justify-between overflow-hidden select-none cursor-crosshair transition-colors duration-500 ${
+        isRageMode ? 'bg-rage-mode' : 'bg-arcade-grid'
+      } ${screenShake} ${isHitstop ? 'hitstop-flash-bg' : ''}`}
     >
       {/* 漫画風集中線 (Radial Manga Speedlines) */}
-      {showSpeedlines && <div className="manga-speedlines-radial" />}
+      {(showSpeedlines || isRageMode) && <div className="manga-speedlines-radial" />}
 
-      {/* TOP ARCADE HUD (Matching user video styling) */}
+      {/* 激怒モード突入バナー */}
+      {rageBanner && (
+        <div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-50 pointer-events-none animate-bounce">
+          <div className="bg-[#ff003c] text-white font-arcade-title font-black text-sm md:text-xl px-6 py-2 rounded-full border-2 border-white shadow-[0_0_30px_#ff003c] flex items-center gap-2 whitespace-nowrap">
+            <Flame className="w-5 h-5 text-white animate-spin" />
+            <span>激怒モード発動！ 全打撃爆発＆スコア超倍増！！</span>
+            <Flame className="w-5 h-5 text-white animate-spin" />
+          </div>
+        </div>
+      )}
+
+      {/* TOP ARCADE HUD */}
       <div className="w-full px-4 pt-3 pb-2 z-40 flex items-center justify-between pointer-events-none">
-        {/* Left: Ranking Status / Notification (As seen in video) */}
+        {/* Left: Ranking Status */}
         <div className="pointer-events-auto">
           <div
             onClick={onOpenLeaderboard}
@@ -372,8 +426,10 @@ export const RushGame: React.FC<RushGameProps> = ({
           </div>
         </div>
 
-        {/* Center: Timer, Score, Combo, Hits (Exact layout from video) */}
-        <div className="flex items-center gap-4 md:gap-8 bg-[#101014]/85 border border-[#27272a] px-4 py-1.5 rounded-2xl shadow-xl">
+        {/* Center: Timer, Score, Combo, Hits */}
+        <div className={`flex items-center gap-4 md:gap-8 bg-[#101014]/90 border px-4 py-1.5 rounded-2xl shadow-xl transition-colors ${
+          isRageMode ? 'border-[#ff003c] shadow-[0_0_20px_rgba(255,0,60,0.5)]' : 'border-[#27272a]'
+        }`}>
           {/* Time (e.g. 30.0 / 29.4) */}
           <div className="text-center min-w-[50px]">
             <div className="text-[9px] text-[#71717a] font-arcade-mono uppercase font-bold tracking-wider">TIME</div>
@@ -395,7 +451,7 @@ export const RushGame: React.FC<RushGameProps> = ({
           {/* Combo */}
           <div className="text-center min-w-[45px]">
             <div className="text-[9px] text-[#71717a] font-arcade-mono uppercase font-bold tracking-wider">COMBO</div>
-            <div className="font-arcade-mono text-xl md:text-2xl font-black text-white tabular-nums">
+            <div className={`font-arcade-mono text-xl md:text-2xl font-black tabular-nums ${isRageMode ? 'text-[#ff003c] animate-pulse' : 'text-white'}`}>
               {combo}
             </div>
           </div>
@@ -428,59 +484,79 @@ export const RushGame: React.FC<RushGameProps> = ({
         </div>
       </div>
 
-      {/* Super Move Meter at Bottom-Center */}
+      {/* 画面下部：連打数に応じて溜まる「怒りゲージ」 (RAGE GAUGE) */}
       {gameState === 'PLAYING' && (
-        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-30 pointer-events-none flex flex-col items-center">
-          <div className="flex items-center gap-1.5 text-[10px] font-arcade-mono font-bold tracking-widest text-[#71717a] mb-1">
-            <Zap className={`w-3.5 h-3.5 ${superMeter >= 100 ? 'text-[#ff003c] fill-[#ff003c] animate-bounce' : 'text-[#71717a]'}`} />
-            SUPER METER {superMeter}%
+        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-30 pointer-events-none flex flex-col items-center w-full max-w-sm px-4">
+          <div className="flex items-center justify-between w-full text-[10px] font-arcade-mono font-bold tracking-widest mb-1.5">
+            <span className="flex items-center gap-1.5 text-white">
+              <Flame className={`w-4 h-4 ${isRageMode ? 'text-[#ff003c] animate-spin' : rageMeter >= 85 ? 'text-[#ff003c] animate-bounce' : 'text-[#71717a]'}`} />
+              {isRageMode ? '🔥 激怒モード発動中！' : '怒りゲージ (RAGE METER)'}
+            </span>
+            <span className={`font-black ${isRageMode ? 'text-[#ff003c] animate-pulse' : 'text-white'}`}>
+              {isRageMode ? `残り ${rageTimeRemaining.toFixed(1)}s` : `${Math.round(rageMeter)}%`}
+            </span>
           </div>
-          <div className="w-48 h-2 bg-[#18181f] border border-[#27272a] rounded-full overflow-hidden p-0.5">
+
+          {/* Liquid Rage Meter Bar */}
+          <div className={`w-full h-3.5 bg-[#14141a] border-2 rounded-full overflow-hidden p-0.5 shadow-2xl transition-all ${
+            isRageMode
+              ? 'border-[#ff003c] shadow-[0_0_20px_#ff003c] rage-meter-max'
+              : rageMeter >= 85
+              ? 'border-[#ff003c] rage-meter-max'
+              : 'border-[#27272a]'
+          }`}>
             <div
               className={`h-full rounded-full transition-all duration-100 ${
-                superMeter >= 100
-                  ? 'bg-gradient-to-r from-red-600 via-rose-500 to-white shadow-[0_0_12px_#ff003c] animate-pulse'
-                  : 'bg-red-600'
+                isRageMode
+                  ? 'bg-gradient-to-r from-red-600 via-rose-500 to-white shadow-[0_0_15px_#ff003c] animate-pulse'
+                  : 'rage-meter-bar'
               }`}
-              style={{ width: `${superMeter}%` }}
+              style={{
+                width: isRageMode
+                  ? `${(rageTimeRemaining / 7.5) * 100}%`
+                  : `${rageMeter}%`
+              }}
             />
           </div>
         </div>
       )}
 
-      {/* ARCADE PUNCH OVERLAYS (Flying Fists, Onomatopoeia, Hitsparks, Super Cutin) */}
+      {/* ARCADE PUNCH OVERLAYS (Flying Fists, Onomatopoeia, Hitsparks, Super Cutin, and RAGE EXPLOSIONS) */}
       <ArcadePunchOverlay
         effects={effects}
         activeFist={activeFist}
         superFinisher={superFinisher}
+        isRageMode={isRageMode}
       />
 
-      {/* PLAYING TARGET (Appears dynamically across ALL sectors: top, mid, bottom, corners) */}
+      {/* PLAYING TARGET */}
       {gameState === 'PLAYING' && (
         <div
           onClick={handlePunch}
           onTouchStart={handlePunch}
           className={`absolute z-20 transform -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-transform duration-75 active:scale-90 ${
             currentTarget.isDying ? currentTarget.blowbackAnim : ''
-          } ${isHitstop ? 'hitstop-active' : ''}`}
+          } ${isHitstop ? 'hitstop-active' : ''} ${isRageMode ? 'rage-fire-edge' : ''}`}
           style={{
             left: `${currentTarget.x}%`,
             top: `${currentTarget.y}%`
           }}
         >
-          {/* Target Reticle (Radar circles & corner brackets matching video) */}
+          {/* Target Reticle */}
           <div className="relative w-28 h-28 md:w-36 md:h-36 flex items-center justify-center group">
             {/* Spinning Radar Ring */}
-            <div className="reticle-crosshair" />
+            <div className={`reticle-crosshair ${isRageMode ? 'border-[#ff003c]' : ''}`} />
 
             {/* Corner Brackets */}
-            <div className="reticle-bracket top-0 left-0 border-t-2 border-l-2" />
-            <div className="reticle-bracket top-0 right-0 border-t-2 border-r-2" />
-            <div className="reticle-bracket bottom-0 left-0 border-b-2 border-l-2" />
-            <div className="reticle-bracket bottom-0 right-0 border-b-2 border-r-2" />
+            <div className={`reticle-bracket top-0 left-0 border-t-2 border-l-2 ${isRageMode ? 'border-[#ff003c]' : ''}`} />
+            <div className={`reticle-bracket top-0 right-0 border-t-2 border-r-2 ${isRageMode ? 'border-[#ff003c]' : ''}`} />
+            <div className={`reticle-bracket bottom-0 left-0 border-b-2 border-l-2 ${isRageMode ? 'border-[#ff003c]' : ''}`} />
+            <div className={`reticle-bracket bottom-0 right-0 border-b-2 border-r-2 ${isRageMode ? 'border-[#ff003c]' : ''}`} />
 
             {/* Center Target Portrait */}
-            <div className="relative w-20 h-20 md:w-24 md:h-24 rounded-full overflow-hidden border-2 border-white/60 bg-[#121217] shadow-[0_0_20px_rgba(0,0,0,0.8)]">
+            <div className={`relative w-20 h-20 md:w-24 md:h-24 rounded-full overflow-hidden border-2 bg-[#121217] shadow-[0_0_20px_rgba(0,0,0,0.8)] ${
+              isRageMode ? 'border-[#ff003c] shadow-[0_0_25px_#ff003c]' : 'border-white/60'
+            }`}>
               <img
                 src={character.image}
                 alt={character.name}
@@ -489,27 +565,23 @@ export const RushGame: React.FC<RushGameProps> = ({
               />
             </div>
 
-            {/* Small red crosshair dot in center */}
+            {/* Red crosshair dot in center */}
             <div className="absolute w-2 h-2 rounded-full bg-[#ff003c] shadow-[0_0_8px_#ff003c] pointer-events-none" />
           </div>
         </div>
       )}
 
-      {/* START SCREEN (READY? Mode matching user's video) */}
+      {/* START SCREEN (READY? Mode) */}
       {gameState === 'READY' && (
         <div className="absolute inset-0 z-30 flex flex-col items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          {/* Big BOLD "READY?" in Impact/Dela Gothic */}
           <h1 className="text-6xl md:text-8xl font-arcade-title font-black text-white tracking-widest mb-6 text-arcade-white-shadow">
             READY?
           </h1>
 
-          {/* Central Target Preview Card with Reticle */}
           <div className="relative mb-6">
             <div className="w-40 h-40 md:w-48 md:h-48 rounded-2xl border border-[#27272a] bg-[#101014] flex flex-col items-center justify-center p-3 relative group">
-              {/* Radar ring */}
               <div className="reticle-crosshair" />
 
-              {/* Character Face */}
               <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-white/50 mb-2">
                 <img
                   src={character.image}
@@ -522,7 +594,6 @@ export const RushGame: React.FC<RushGameProps> = ({
                 {character.isCustom ? 'CUSTOM TARGET' : character.name}
               </div>
 
-              {/* Quick switch badge */}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -535,7 +606,6 @@ export const RushGame: React.FC<RushGameProps> = ({
             </div>
           </div>
 
-          {/* Bold Red "START" Button (As in video) */}
           <button
             onClick={handleStart}
             className="btn-arcade-red px-10 py-3.5 rounded-xl text-base md:text-lg tracking-widest font-black uppercase"
@@ -543,14 +613,13 @@ export const RushGame: React.FC<RushGameProps> = ({
             START
           </button>
 
-          {/* Subtext below (As in video: TAP OR PUNCH THE TARGET) */}
           <div className="text-[11px] font-arcade-mono tracking-[0.25em] text-[#71717a] uppercase mt-4 font-bold">
             TAP OR PUNCH THE TARGET
           </div>
         </div>
       )}
 
-      {/* COUNTDOWN SCREEN: 3, 2, 1 inside target reticle */}
+      {/* COUNTDOWN SCREEN */}
       {gameState === 'COUNTDOWN' && (
         <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/80 pointer-events-none">
           <div className="relative w-48 h-48 flex items-center justify-center">

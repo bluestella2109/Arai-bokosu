@@ -17,12 +17,14 @@ interface ArcadePunchOverlayProps {
     x: number;
     y: number;
   } | null;
+  isRageMode?: boolean;
 }
 
 export const ArcadePunchOverlay: React.FC<ArcadePunchOverlayProps> = ({
   effects,
   activeFist,
-  superFinisher
+  superFinisher,
+  isRageMode = false
 }) => {
   return (
     <div className="absolute inset-0 pointer-events-none overflow-hidden z-30">
@@ -103,14 +105,25 @@ export const ArcadePunchOverlay: React.FC<ArcadePunchOverlayProps> = ({
       {/* 3. 打撃地点の衝撃波・火花・ダメージ・オノマトペ */}
       {effects.map((eff) => (
         <React.Fragment key={eff.id}>
+          {/* 激怒モード常時爆発エフェクト or クリティカル時の大爆発 */}
+          {(isRageMode || eff.isCritical) && (
+            <div
+              className="rage-explosion-burst"
+              style={{
+                left: `${eff.x}px`,
+                top: `${eff.y}px`
+              }}
+            />
+          )}
+
           {/* Crimson Shockwave Ring */}
           <div
             className="impact-shockwave-red absolute"
             style={{
               left: `${eff.x}px`,
               top: `${eff.y}px`,
-              width: eff.isCritical ? '140px' : '90px',
-              height: eff.isCritical ? '140px' : '90px'
+              width: eff.isCritical || isRageMode ? '150px' : '90px',
+              height: eff.isCritical || isRageMode ? '150px' : '90px'
             }}
           />
 

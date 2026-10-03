@@ -321,6 +321,59 @@ class SoundSynthesizer {
     });
   }
 
+  // 13. 激怒モード突入 Roar & Alert
+  public playRageRoar() {
+    if (!this.enabled) return;
+    this.initCtx();
+    if (!this.ctx) return;
+
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(60, t);
+    osc.frequency.exponentialRampToValueAtTime(320, t + 0.2);
+    osc.frequency.exponentialRampToValueAtTime(45, t + 0.6);
+
+    gain.gain.setValueAtTime(1.0 * this.volume, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.65);
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    osc.start(t);
+    osc.stop(t + 0.7);
+
+    this.playNoiseThud(0.5, 0.9, 500);
+  }
+
+  // 14. 激怒モード常時爆発エフェクト音 (Explosion blast)
+  public playExplosion() {
+    if (!this.enabled) return;
+    this.initCtx();
+    if (!this.ctx) return;
+
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(180, t);
+    osc.frequency.exponentialRampToValueAtTime(30, t + 0.22);
+
+    gain.gain.setValueAtTime(0.9 * this.volume, t);
+    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.24);
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    osc.start(t);
+    osc.stop(t + 0.25);
+
+    this.playNoiseThud(0.2, 0.8, 650);
+  }
+
   // Internal helper for white noise bursts (thump/explosion)
   private playNoiseThud(duration: number, volume: number, filterFreq: number = 400) {
     if (!this.ctx) return;
