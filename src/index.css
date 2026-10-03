@@ -1,0 +1,518 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   ARCADE FIGHTING PUNCH CONSTITUTION
+   Color Palette: Pure Black, Crisp White, Gunmetal Gray, Arcade Crimson Red
+   ========================================================================== */
+
+:root {
+  --arcade-bg: #070709;
+  --arcade-card: #121217;
+  --arcade-border: #27272a;
+  --arcade-red: #ff003c;
+  --arcade-red-glow: rgba(255, 0, 60, 0.5);
+  --arcade-white: #ffffff;
+  --arcade-gray: #71717a;
+}
+
+body {
+  background-color: var(--arcade-bg);
+  color: var(--arcade-white);
+  overflow-x: hidden;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Arcade Typography */
+.font-arcade-title {
+  font-family: 'Dela Gothic One', sans-serif;
+  letter-spacing: 0.05em;
+}
+
+.font-arcade-impact {
+  font-family: 'Bangers', 'Dela Gothic One', sans-serif;
+  letter-spacing: 0.08em;
+}
+
+.font-arcade-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Crisp Red/White arcade text drop shadow */
+.text-arcade-shadow {
+  text-shadow: 0 0 15px rgba(255, 0, 60, 0.7), 2px 2px 0 #000;
+}
+
+.text-arcade-white-shadow {
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.6), 2px 2px 0 #000;
+}
+
+/* Background Grid & Radar Halftone */
+.bg-arcade-grid {
+  background-color: #070709;
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+/* Radar rings overlay */
+.radar-ring {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 9999px;
+  pointer-events: none;
+}
+
+/* ==========================================================================
+   ① 拳が画面外から飛んでくる (FLYING FISTS FROM OFFSCREEN)
+   High velocity arcade punch rockets into the hit coordinates
+   ========================================================================== */
+
+/* Fist flying in from bottom-left */
+.fist-fly-bl {
+  animation: fist-bl-anim 0.16s cubic-bezier(0.05, 0.9, 0.2, 1) forwards;
+  pointer-events: none;
+}
+@keyframes fist-bl-anim {
+  0% {
+    transform: translate(-180vw, 120vh) rotate(-35deg) scale(0.4);
+    opacity: 0;
+  }
+  40% {
+    opacity: 1;
+  }
+  80% {
+    transform: translate(-10%, -10%) rotate(5deg) scale(1.35);
+    opacity: 1;
+    filter: drop-shadow(0 0 25px #ff003c);
+  }
+  100% {
+    transform: translate(-25%, -25%) rotate(-5deg) scale(1.1);
+    opacity: 0;
+  }
+}
+
+/* Fist flying in from bottom-right */
+.fist-fly-br {
+  animation: fist-br-anim 0.16s cubic-bezier(0.05, 0.9, 0.2, 1) forwards;
+  pointer-events: none;
+}
+@keyframes fist-br-anim {
+  0% {
+    transform: translate(180vw, 120vh) rotate(35deg) scaleX(-1) scale(0.4);
+    opacity: 0;
+  }
+  40% {
+    opacity: 1;
+  }
+  80% {
+    transform: translate(10%, -10%) rotate(-5deg) scaleX(-1) scale(1.35);
+    opacity: 1;
+    filter: drop-shadow(0 0 25px #ff003c);
+  }
+  100% {
+    transform: translate(25%, -25%) rotate(5deg) scaleX(-1) scale(1.1);
+    opacity: 0;
+  }
+}
+
+/* Fist flying in from top-right down */
+.fist-fly-tr {
+  animation: fist-tr-anim 0.16s cubic-bezier(0.05, 0.9, 0.2, 1) forwards;
+  pointer-events: none;
+}
+@keyframes fist-tr-anim {
+  0% {
+    transform: translate(150vw, -120vh) rotate(70deg) scale(0.4);
+    opacity: 0;
+  }
+  75% {
+    transform: translate(5%, 5%) rotate(20deg) scale(1.4);
+    opacity: 1;
+    filter: drop-shadow(0 0 25px #ff003c);
+  }
+  100% {
+    transform: translate(-10%, 10%) rotate(10deg) scale(1.1);
+    opacity: 0;
+  }
+}
+
+/* Fist straight uppercut from below */
+.fist-fly-up {
+  animation: fist-up-anim 0.18s cubic-bezier(0.05, 0.9, 0.2, 1) forwards;
+  pointer-events: none;
+}
+@keyframes fist-up-anim {
+  0% {
+    transform: translate(-50%, 150vh) rotate(-90deg) scale(0.4);
+    opacity: 0;
+  }
+  75% {
+    transform: translate(-50%, -10%) rotate(-90deg) scale(1.5);
+    opacity: 1;
+    filter: drop-shadow(0 0 30px #ffffff);
+  }
+  100% {
+    transform: translate(-50%, -40%) rotate(-90deg) scale(1.2);
+    opacity: 0;
+  }
+}
+
+/* ==========================================================================
+   ① ヒットストップ (HIT-STOP / IMPACT FRAME FREEZE)
+   Micro-freeze with stark contrast and flash
+   ========================================================================== */
+
+.hitstop-active {
+  filter: brightness(2.8) contrast(180%) invert(0.15) !important;
+  transform: scale(1.12) !important;
+  transition: none !important;
+}
+
+.hitstop-flash-bg {
+  animation: hitstop-flash 0.08s ease-out;
+}
+@keyframes hitstop-flash {
+  0% { background-color: rgba(255, 255, 255, 0.4); }
+  50% { background-color: rgba(255, 0, 60, 0.3); }
+  100% { background-color: transparent; }
+}
+
+/* ==========================================================================
+   ① 画像の吹っ飛び (TARGET BLOWBACK PHYSICS)
+   Target gets sent flying across the screen on punch
+   ========================================================================== */
+
+.target-blowback-right {
+  animation: blowback-r 0.35s cubic-bezier(0.12, 0.8, 0.33, 1) forwards;
+}
+@keyframes blowback-r {
+  0% {
+    transform: translate(-50%, -50%) scale(1) rotate(0deg);
+  }
+  30% {
+    transform: translate(25px, -20px) scale(1.2, 0.8) rotate(18deg);
+    filter: brightness(2);
+  }
+  100% {
+    transform: translate(220px, 80px) scale(0.5) rotate(75deg);
+    opacity: 0;
+    filter: blur(4px);
+  }
+}
+
+.target-blowback-left {
+  animation: blowback-l 0.35s cubic-bezier(0.12, 0.8, 0.33, 1) forwards;
+}
+@keyframes blowback-l {
+  0% {
+    transform: translate(-50%, -50%) scale(1) rotate(0deg);
+  }
+  30% {
+    transform: translate(-25px, -20px) scale(1.2, 0.8) rotate(-18deg);
+    filter: brightness(2);
+  }
+  100% {
+    transform: translate(-220px, 80px) scale(0.5) rotate(-75deg);
+    opacity: 0;
+    filter: blur(4px);
+  }
+}
+
+.target-blowback-up {
+  animation: blowback-u 0.35s cubic-bezier(0.12, 0.8, 0.33, 1) forwards;
+}
+@keyframes blowback-u {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  30% {
+    transform: translate(-50%, -45px) scale(0.8, 1.3);
+    filter: brightness(2);
+  }
+  100% {
+    transform: translate(-50%, -240px) scale(0.4) rotate(45deg);
+    opacity: 0;
+    filter: blur(4px);
+  }
+}
+
+/* ==========================================================================
+   ① 漫画風集中線 (DYNAMIC MANGA RADIAL SPEED LINES)
+   ========================================================================== */
+
+.manga-speedlines-radial {
+  position: absolute;
+  inset: -50%;
+  width: 200%;
+  height: 200%;
+  background: repeating-conic-gradient(
+    from 0deg at 50% 50%,
+    rgba(255, 255, 255, 0.22) 0deg 1.5deg,
+    transparent 1.5deg 6deg,
+    rgba(255, 0, 60, 0.18) 6deg 7.5deg,
+    transparent 7.5deg 12deg
+  );
+  animation: speedlines-radial-spin 2.5s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes speedlines-radial-spin {
+  0% { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(180deg) scale(1.08); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+
+/* ==========================================================================
+   ① 連続パンチ・ラッシュ (RAPID GATLING COMBO PUNCHES)
+   ========================================================================== */
+
+.gatling-rush-ghost {
+  animation: gatling-ghost-kf 0.2s ease-out forwards;
+  pointer-events: none;
+}
+@keyframes gatling-ghost-kf {
+  0% {
+    transform: translate(var(--gx, 0), var(--gy, 0)) scale(1.3);
+    opacity: 0.9;
+    filter: drop-shadow(0 0 15px #ff003c);
+  }
+  100% {
+    transform: translate(calc(var(--gx, 0) * 1.5), calc(var(--gy, 0) * 1.5)) scale(0.7);
+    opacity: 0;
+  }
+}
+
+/* ==========================================================================
+   ① 超必殺技演出 (SUPER FINISHER / ULTRA IMPACT)
+   ========================================================================== */
+
+.super-cutin-overlay {
+  animation: super-blackout 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes super-blackout {
+  0% {
+    opacity: 0;
+    transform: scale(1.1);
+  }
+  15% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  85% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+
+.super-slash-line {
+  animation: slash-anim 0.4s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
+}
+@keyframes slash-anim {
+  0% {
+    transform: scaleX(0) rotate(-25deg);
+    opacity: 0;
+  }
+  50% {
+    transform: scaleX(1.5) rotate(-25deg);
+    opacity: 1;
+    box-shadow: 0 0 35px #ff003c;
+  }
+  100% {
+    transform: scaleX(2) rotate(-25deg);
+    opacity: 0;
+  }
+}
+
+.super-kanji-pop {
+  animation: kanji-slam 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+@keyframes kanji-slam {
+  0% {
+    transform: scale(3.5);
+    opacity: 0;
+    filter: blur(10px);
+  }
+  25% {
+    transform: scale(1);
+    opacity: 1;
+    filter: blur(0);
+    text-shadow: 0 0 30px #ff003c, 0 0 60px #ffffff;
+  }
+  75% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.3);
+    opacity: 0;
+  }
+}
+
+/* ==========================================================================
+   RETICLE TARGETING CROSSHAIRS (As seen in video)
+   ========================================================================== */
+
+.reticle-crosshair {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 9999px;
+  border: 1px dashed rgba(255, 255, 255, 0.35);
+  animation: reticle-spin 12s linear infinite;
+}
+
+@keyframes reticle-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.reticle-bracket {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-color: rgba(255, 255, 255, 0.7);
+  pointer-events: none;
+}
+
+/* ==========================================================================
+   IMPACT BURST & SHOCKWAVES (Black, White, Red theme)
+   ========================================================================== */
+
+.impact-shockwave-red {
+  border-radius: 9999px;
+  border: 3px solid #ff003c;
+  animation: shockwave-red-kf 0.32s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+  pointer-events: none;
+  box-shadow: 0 0 20px #ff003c, inset 0 0 15px #ffffff;
+}
+
+@keyframes shockwave-red-kf {
+  0% {
+    transform: translate(-50%, -50%) scale(0.2);
+    opacity: 1;
+    border-width: 6px;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(2.6);
+    opacity: 0;
+    border-width: 1px;
+  }
+}
+
+.arcade-spark {
+  animation: arcade-spark-kf 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  pointer-events: none;
+}
+
+@keyframes arcade-spark-kf {
+  0% {
+    transform: translate(0, 0) scale(1.2);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--tx, 40px), var(--ty, -50px)) scale(0.2);
+    opacity: 0;
+  }
+}
+
+/* Screen Shake for Arcade Game */
+.arcade-shake-light {
+  animation: arc-shake-l 0.12s ease-out;
+}
+@keyframes arc-shake-l {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(-4px, 3px); }
+  50% { transform: translate(4px, -3px); }
+  75% { transform: translate(-2px, 1px); }
+  100% { transform: translate(0, 0); }
+}
+
+.arcade-shake-heavy {
+  animation: arc-shake-h 0.22s ease-out;
+}
+@keyframes arc-shake-h {
+  0% { transform: translate(0, 0); }
+  20% { transform: translate(-10px, 8px); }
+  40% { transform: translate(10px, -8px); }
+  60% { transform: translate(-6px, 5px); }
+  80% { transform: translate(4px, -3px); }
+  100% { transform: translate(0, 0); }
+}
+
+.arcade-shake-super {
+  animation: arc-shake-super 0.4s ease-out;
+}
+@keyframes arc-shake-super {
+  0% { transform: translate(0, 0) scale(1); }
+  15% { transform: translate(-18px, 14px) scale(1.03); }
+  35% { transform: translate(18px, -14px) scale(0.98); }
+  55% { transform: translate(-12px, 10px) scale(1.02); }
+  75% { transform: translate(8px, -6px) scale(0.99); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+
+/* Damage Floater */
+.arcade-damage-number {
+  animation: arc-damage-kf 0.45s ease-out forwards;
+  pointer-events: none;
+}
+@keyframes arc-damage-kf {
+  0% {
+    transform: translate(-50%, -50%) scale(0.5);
+    opacity: 0;
+  }
+  25% {
+    transform: translate(-50%, -85%) scale(1.4);
+    opacity: 1;
+  }
+  75% {
+    transform: translate(-50%, -125%) scale(1.1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -160%) scale(0.85);
+    opacity: 0;
+  }
+}
+
+/* Buttons in Minimal Black/White/Red Style */
+.btn-arcade-red {
+  background-color: #ff003c;
+  color: #ffffff;
+  font-family: 'Dela Gothic One', sans-serif;
+  border: 1px solid #ff3366;
+  box-shadow: 0 0 15px rgba(255, 0, 60, 0.4);
+  transition: all 0.12s ease;
+}
+.btn-arcade-red:hover {
+  background-color: #e60036;
+  box-shadow: 0 0 25px rgba(255, 0, 60, 0.7);
+  transform: translateY(-1px);
+}
+.btn-arcade-red:active {
+  transform: translateY(2px);
+  box-shadow: 0 0 8px rgba(255, 0, 60, 0.4);
+}
+
+.btn-arcade-dark {
+  background-color: #121217;
+  color: #ffffff;
+  font-family: 'Dela Gothic One', sans-serif;
+  border: 1px solid #27272a;
+  transition: all 0.12s ease;
+}
+.btn-arcade-dark:hover {
+  background-color: #1c1c24;
+  border-color: #3f3f46;
+  transform: translateY(-1px);
+}
+.btn-arcade-dark:active {
+  transform: translateY(2px);
+}

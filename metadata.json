@@ -1,0 +1,6 @@
+{
+  "name": "ストレス発散！爆打タップ＆パンチ",
+  "description": "人の画像を連打＆殴ってストレス解消！ド派手な漫画風演出、衝撃エフェクト、30秒ラッシュ＆リアルタイムランキング搭載の爽快連打アクションゲーム",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
